@@ -1,0 +1,278 @@
+Lanner Bypass/Watchdog Module Access Code
+=========================================
+
+Aug 31, 2018
+
+Contents
+========
+- In This Release
+- Building 
+- Installation
+- HOW-TO Access
+- Support model
+- License
+
+
+In This Release
+===============
+This file describes the Lanner bypass/watchdog module acces code.  
+This package provides program and driver for both DOS and Linux.
+Separated makefile available as well.(Makefile.dos or Makefile.linux)
+
+For DOS environment, Use DJGPP as compiler, use DJGPP and Makefile.dos.
+
+For Linux, supports kernel versions 2.4.x/2.6/3.x/4.x and use Makefile.linux. 
+
+
+This release provide 3 ways to access Lanner bypass/watchdog module: 
+
+1. DIRECT_IO_ACCESS:
+
+   To access Lanner bypass/watchdog module by userland application direct
+   accessing. This mode JUST FOR providing quick way for user to realize 
+   Lannner watchdog/bypass function. This mode supported on DOS and Linux.
+
+   Note: This mode is enabled by set DIRECT_IO_ACCESS=1 in Makefile.
+
+
+2. LANNER_DRIVER:
+
+   To access Lanner bypass/watchdog module through lanner driver. 
+   Lanner driver(bpwd_drv.ko) is available in bin sub-directory after make.
+   This driver is only supported as a loadable module at this time.  Lanner is
+   not supplying patches against the kernel source to allow for static linking
+   of the driver. 
+
+   Note: This mode is enabled by set DIRECT_IO_ACCESS=0 and LANNER_DRIVER=1 in 
+   Makefile.
+
+
+3. LINUX_KERNEL_DRIVER:
+
+   To access Lanner bypass/watchdog module through linux i2c dev interface. 
+   i2c-dev.ko and i2c-i801.ko are need to be loader for normal access.
+   /dev/i2c-0 c 89 0 node is need to be created as well.
+
+   Note1: This mode is enabled by set DIRECT_IO_ACCESS=0 and LANNER_DRIVER=0 in 
+          Makefile.
+   Note2: Linux kernel driver(i2c-i801.c) is lacked for block accessing. 
+          Varied kernel version may get different results. 
+          For example, 2.6.18(CentOS-54) do not support SMBUS block function.
+	  2.6.25(FC9) block write function fail. 
+          Since Lanner bypass/watchdog ARP function relied on BLOCK+PEC 
+          accessing, this cause ARP function fail.
+   Note3: MB-5330 is using AMD Structure system, and we only support 
+          DIRECT_IO_ACCESS and LANNER_DRIVER in source code.
+          
+
+
+Building
+========
+To build, 4 steps to completed:
+
+1. Identify current OS and select proper Makefile. 
+   Copy Makefile.(os) to Makefile.
+
+2. Select access mode.(DIRECT_IO_ACCESS=[0|1] and LANNER_DRIVER=[0|1] by 
+   edit Makefile)
+
+4. Select Major number assign mode. (MAJOR_NUMBER=[0|xxx] by edit Makefile)
+
+	 Note: 1. MAJOR_NUMBER define only usefule in LANNER_DRIVER=1
+         2. Set MAJOR_NUMBER=0, then use Dynamic major number assign
+	       
+
+3. Just type make to build, once completed, bin sub-directory contains.
+
+
+
+Installation
+============
+To installation, depend on what's access mode you set:
+
+If DIRECT_IO_ACCESS=1, no driver is need. Just execute bpwd_tst program to
+to access Lanner bypass/watchdog module.
+
+If DIRECT_IO_ACCESS=0 and LANNER_DRIVER=1, driver is needed. Insert module and
+create node in /dev as below example:
+
+	#insmod bpwd_drv.[k]o
+
+	#mknod /dev/bpwd_drv c 247 0
+
+  Note: '247' in here is for example, if '247' is already occupied,
+           please check other major number of kernel driver populated. 
+           or modify Makefile's "MAJOR_NUMBER" to "0" use Dynamic number,
+           then chenag it as dynamic assigned unmber.
+
+If DIRECT_IO_ACCESS=0 and LANNER_DRIVER=0, linux kernel driver is needed. 
+i2c subsystem: i2c-core, i2c-dev and busses/i2c-i801 need to be loaded before
+access Lanner bypass/watchdog module, dev node need to create as below:
+
+	#mknod /dev/i2c-0 c 89 0
+	 
+	Note: '0' in here is for example, check proper bus number of kernel driver 
+              populated. 
+              
+
+HOW-TO ACCESS
+=============
+Once build completed, application(and driver) is available in bin sub-directory.
+Main access program is bpwd_tst. just run it without argument will list help.
+
+Lanner Bypass/Watchdog Access Code:V1.2.5 2018-04-19
+Usage: ./bpwd_tst -S [-M [model_name]]
+	Or 
+	./bpwd_tst -S [-M [Simple_model_name]]
+        Scan Lanner bypass module.
+
+Usage: ./bpwd_tst -r -d [i2c_address] -c [command] [-M [module_name]]
+	Or
+	./bpwd_tst -r -d [i2c_address] -c [command] [-M [Simple_model_name]]
+        SMBUS read word data protocol
+
+Usage: ./bpwd_tst -w -d [i2c_address] -c [command] -o [byte_data] [-M [module_name]]
+	Or
+	./bpwd_tst -w -d [i2c_address] -c [command] -o [byte_data] [-M [Simple_model_name]]
+        SMBUS write byte data protocol
+
+Usage: ./bpwd_tst -I -d [i2c_address] [-M [module_name]]
+	Or
+	./bpwd_tst -I -d [i2c_address] [-M [Simple_model_name]]
+        Get Lanner bypass module information
+Global argument:
+        -v: be verbose
+        -h: help
+
+
+For multiple card configuration
+-------------------------------
+  Since multiple bypass add-on card maybe populate on motherboard, isolate bypass 
+card by I2C switch is implemented in following motherboard:
+
+	model_name	simple_model_name	Lanner model 
+	=====================================================
+	MB-887X		Mode1			  MB-8875, MB-8876, MB-8865, MB-8866, 
+	                      MB-8877, MB-8771,NCB-5210
+	MB-8877EXT	Mode2			MB-8877(with RC-8877 expansion card, 4 slots)							
+	MB-8865EXT	Mode3			MB-8865(with RC-8865 expansion card, 6 slots)						
+	MB-7582EXT	Mode4			MB-7582(with RC-7582 expansion card, 6 slots)								
+	MB-7583		  Mode5			MB-7583, MB-7573								
+	MB-8771EXT	Mode6			MB-8771(with RC-8771 expansion card, 2 slots)
+  MB-8895		  Mode7			MB-8896, MB-8895, MB-8893, NCB-5510A
+	MB-MFI20K	  Mode8			MB-MFI20K(with RC-MFI20K expansion card, 9 slots)  	
+  MB-9655		  Mode9			MB-9655
+	NCB-5510EXT	Mode10		NCB-5510(with RC-88771 expansion card, 8 slots)
+	NCB-5220	  Mode11		NCB-5220
+	NCB-2510	  Mode12		NCB-2510
+	NCB-6210	  Mode13		NCB-6210
+ 
+Program need to specific with -M [model_name] or -M [simple_model_name]
+for dedicate motherboard and device address [specific by -d]
+ is fixed as below:
+	0x30: slot1
+	0x31: slot2
+	0x32: slot3
+	0x33: slot4
+	0x34: slot5
+	0x35: slot6
+	0x36: slot7
+  0x37: slot8
+  0x38: slot9
+
+If bypass controller is add-on card, below using i2c address 0x30 at first slot on the motherboard. 
+Following is example within -M command:
+
+  MB-8875 as example, access slot1( address is :0x30)
+    Write:
+	bpwd_tst -w -d 0x30 -c 0x12 -o 0x03 -M MB-887X 
+		Or
+	bpwd_tst -w -d 0x30 -c 0x12 -o 0x03 -M Mode1
+	
+    Read:
+	bpwd_tst -r -d 0x30 -c 0x12 -M MB-887X  
+		Or
+	bpwd_tst -r -d 0x30 -c 0x12 -M Mode1
+	
+     Scan Bus:
+	bpwd_tst -S -M MB-887X
+		Or
+	bpwd_tst -S -M Mode1
+	
+For on-board configuration
+--------------------------
+If bypass controller is embedded in motherboard, no -M parameter is needed and i2c address is fixed to 0x37.
+Following is example without -M command:
+
+     MB-8765 as exampple
+     Write
+	bpwd_tst -w -d 0x37 -c 0x12 -o 0x03
+     Read:
+	bpwd_tst -r -d 0x37 -c 0x12
+     Scan Bus:
+	bpwd_tst -S
+
+Example sub-directory presented you how to access module. 
+You may add -M parameter for proper motherboard.
+
+
+
+Support model
+=============
+Following is the list of Lanner's model which support 3rd bypass.
+
+3rd bypass add-on card, which connect to motherboard with i2c switch to control each device.
+You should have to use -M command to control each slot.
+	model_name	simple_model_name	Lanner model 
+	=====================================================
+	MB-887X		  Mode1			MB-8875, MB-8876, MB-8865, MB-8866,
+	                      MB-8877, MB-8771,NCB-5210
+	MB-8877EXT	Mode2			MB-8877(with RC-8877 expansion card, 4 slots)							
+  MB-8865EXT	Mode3			MB-8865(with RC-8865 expansion card, 6 slots)								
+	MB-7582EXT	Mode4			MB-7582(with RC-7582 expansion card, 6 slots)								
+	MB-7583		  Mode5			MB-7583, MB-7573								
+	MB-8771EXT	Mode6			MB-8771(with RC-8771 expansion card, 2 slots)
+  MB-8895		  Mode7			MB-8896, MB-8895, MB-8893, NCB-5510A
+	MB-MFI20K	  Mode8			MB-MFI20K(with RC-MFI20K expansion card, 9 slots)  	
+  MB-9655		  Mode9			MB-9655
+	NCB-5510EXT	Mode10  	NCB-5510(with RC-88771 expansion card, 8 slots)	
+	NCB-5220	  Mode11		NCB-5220
+	NCB-2510	  Mode12		NCB-2510
+	NCB-6210	  Mode13		NCB-6210
+	
+3rd bypass embedded on motherboard, which only use i2c address 0x37 to control the micro-processor.
+No need to use -M command to control micro-processor.       	 
+    Lanner model
+    ====================================
+    MB-8756
+    MB-8770
+    MB-7582
+    MB-5330	( There is only support lanner driver and direct i/o access to MB-5330 )	
+    MB-7583
+    FW-8771
+
+License
+=======
+Lanner bypass/watchdog module access code
+Copyright(c) 2013 Lanner Electronics Inc.
+
+This program is free software; you can redistribute it and/or modify it
+under the terms and conditions of the GNU General Public License,
+version 2, as published by the Free Software Foundation.
+
+This program is distributed in the hope it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc.,
+51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+
+The full GNU General Public License is included in this distribution in
+the file called "COPYING".
+
+
+
+
+
